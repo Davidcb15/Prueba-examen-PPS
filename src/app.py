@@ -72,3 +72,4 @@ def user_update(id: int, alu: schemas.StudentIn):
     res.age = alu.age
     db.session.commit()
     return res
+# Cambio para el Action
