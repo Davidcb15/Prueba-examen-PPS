@@ -1,0 +1,46 @@
+name: CI/CD Docker y AWS
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'  # Solo se activa si cambias algo en la carpeta src
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v3
+
+      - name: Login en DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DH_USUARIO }}
+          password: ${{ secrets.DH_TOKEN }}
+
+      - name: Build y Push a DockerHub
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          # IMPORTANTE: Cambia 'mi-app-examen' por el nombre que quieras
+          tags: ${{ secrets.DH_USUARIO }}/mi-app-examen:latest
+
+  deploy-aws:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Desplegar en EC2 vía SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.AMZ_IP }}
+          username: ${{ secrets.AMZ_USUARIO }}
+          key: ${{ secrets.AMZ_CLAVE }}
+          script: |
+            # Parar lo que haya antes para que no choque el puerto
+            sudo docker stop web-examen || true
+            sudo docker rm web-examen || true
+            # Bajar la imagen nueva que acabamos de subir
+            sudo docker pull ${{ secrets.DH_USUARIO }}/mi-app-examen:latest
+            # Lanzar en el puerto 80 (como pide el examen)
+            sudo docker run -d -p 80:8000 --name web-examen ${{ secrets.DH_USUARIO }}/mi-app-examen:latest
